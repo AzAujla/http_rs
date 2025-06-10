@@ -5,6 +5,7 @@ use tokio::{
     net::TcpListener,
 };
 
+mod database;
 mod http;
 mod models;
 mod request;

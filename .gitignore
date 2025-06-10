@@ -1,1 +1,5 @@
 /target
+*.sqlite
+*.db
+*.env
+!*.env.public

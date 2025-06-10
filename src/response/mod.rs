@@ -48,6 +48,14 @@ impl HttpResponseBuilder {
             body: String::new(),
         }
     }
+    pub fn r_500() -> HttpResponse {
+        HttpResponse {
+            version: HttpVersion::Http1_1,
+            status: HttpStatus::InternalServerError,
+            headers: HashMap::new(),
+            body: String::new(),
+        }
+    }
     pub fn r_404() -> HttpResponse {
         HttpResponse {
             version: HttpVersion::Http1_1,
