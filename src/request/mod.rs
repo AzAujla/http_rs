@@ -1,6 +1,9 @@
 use urlencoding::decode;
 
-use crate::http::{DisplayHeaders, HttpMethod, HttpVersion};
+use crate::{
+    http::{DisplayHeaders, HttpMethod, HttpVersion},
+    utils::remove_trailing_slash,
+};
 use std::collections::HashMap;
 
 pub struct HttpRequest {
@@ -80,7 +83,7 @@ impl HttpRequest {
         Ok(HttpRequest {
             method,
             uri_raw,
-            uri,
+            uri: remove_trailing_slash(uri),
             version,
             headers,
             get_params,

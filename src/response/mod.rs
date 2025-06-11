@@ -1,6 +1,7 @@
 use crate::http::{DisplayHeaders, HttpStatus, HttpVersion};
 use std::{collections::HashMap, fmt::Display};
 
+#[derive(Clone)]
 pub struct HttpResponse {
     version: HttpVersion,
     status: HttpStatus,

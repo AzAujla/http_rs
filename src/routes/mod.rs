@@ -3,7 +3,6 @@ use crate::{
     response::{HttpResponse, HttpResponseBuilder},
     routes::router::{AddRoute, Router},
 };
-use regex::Regex;
 
 mod route;
 mod router;
@@ -23,12 +22,16 @@ fn hello_user(params: Vec<String>) -> HttpResponse {
 pub fn handle_request(request: HttpRequest) -> HttpResponse {
     let router = Router::new()
         .add_route(
-            Regex::new(r"^/$").unwrap(),
-            hello_world as fn() -> HttpResponse,
+            "^/user/([^/]+)$",
+            hello_user as fn(Vec<String>) -> HttpResponse,
         )
         .add_route(
-            Regex::new(r"^/user/([^/]+)$").unwrap(),
-            hello_user as fn(Vec<String>) -> HttpResponse,
+            "^/menu$",
+            Router::serve_file(String::from("public"), String::from("menu.html")),
+        )
+        .add_route(
+            "^/$",
+            Router::serve_file(String::from("public"), String::from("index.html")),
         );
 
     router.route(request)

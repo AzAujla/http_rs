@@ -3,6 +3,7 @@ use regex::Regex;
 use rusqlite::Connection;
 
 pub enum Handler {
+    Response(HttpResponse),
     Base(fn() -> HttpResponse),
     Req(fn(HttpRequest) -> HttpResponse),
     Params(fn(Vec<String>) -> HttpResponse),
@@ -47,6 +48,7 @@ macro_rules! impl_route_new {
 }
 
 impl_route_new! {
+    HttpResponse => Response,
     fn() -> HttpResponse => Base,
     fn(HttpRequest) -> HttpResponse => Req,
     fn(Vec<String>) -> HttpResponse => Params,

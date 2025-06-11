@@ -11,6 +11,7 @@ mod models;
 mod request;
 mod response;
 mod routes;
+mod utils;
 mod views;
 
 #[tokio::main]
