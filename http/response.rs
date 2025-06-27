@@ -9,7 +9,7 @@ pub struct Response {
     status: HttpStatusCode,
     headers: HashMap<String, String>,
     cookies: HashMap<String, String>,
-    body: String,
+    body: Vec<u8>,
 }
 
 impl Response {
@@ -19,7 +19,7 @@ impl Response {
             status: HttpStatusCode::OK,
             headers: HashMap::from([("Content-Length".into(), "0".into())]),
             cookies: HashMap::new(),
-            body: String::new(),
+            body: Vec::new(),
         }
     }
 }
@@ -167,7 +167,7 @@ impl Display for Response {
                     .map(|(a, b)| { format!("{}: {}", a, b) })
                     .collect::<Vec<String>>()
                     .join("\r\n"),
-                self.body
+                String::from_utf8_lossy(self.body.as_slice())
             )
         } else {
             write!(
@@ -184,7 +184,7 @@ impl Display for Response {
                     .map(|(a, b)| format!("{}={}", a, b))
                     .collect::<Vec<String>>()
                     .join("; "),
-                self.body
+                String::from_utf8_lossy(self.body.as_slice())
             )
         }
     }
@@ -195,7 +195,7 @@ pub struct ReponseBuilder {
     status: HttpStatusCode,
     headers: HashMap<String, String>,
     cookies: HashMap<String, Cookie>,
-    body: String,
+    body: Vec<u8>,
 }
 
 impl ReponseBuilder {
@@ -209,8 +209,8 @@ impl ReponseBuilder {
         self
     }
 
-    pub fn header(mut self, k: &'static str, v: &'static str) -> Self {
-        self.headers.insert(String::from(k), String::from(v));
+    pub fn header<F: ToString, G: ToString>(mut self, k: F, v: G) -> Self {
+        self.headers.insert(k.to_string(), v.to_string());
         self
     }
 
@@ -226,8 +226,8 @@ impl ReponseBuilder {
         &mut self.headers
     }
 
-    pub fn cookie(mut self, k: &'static str, v: Cookie) -> Self {
-        self.cookies.insert(String::from(k), v);
+    pub fn cookie<F: ToString>(mut self, k: F, v: Cookie) -> Self {
+        self.cookies.insert(k.to_string(), v);
         self
     }
 
@@ -244,13 +244,20 @@ impl ReponseBuilder {
     }
 
     pub fn body<T: ToString>(mut self, body: T) -> Self {
-        self.body = body.to_string();
+        self.body = Vec::from(body.to_string().as_bytes());
         self.headers
             .insert(String::from("Content-Type"), "text/plain".to_string());
         self.headers.insert(
             String::from("Content-Length"),
             format!("{}", self.body.len()),
         );
+        self
+    }
+
+    pub fn body_raw(mut self, body: Vec<u8>) -> Self {
+        self.headers
+            .insert("Content-Length".into(), format!("{}", body.len()));
+        self.body = body;
         self
     }
 
@@ -261,7 +268,14 @@ impl ReponseBuilder {
     }
 
     pub fn json<T: Serialize>(mut self, body: T) -> Self {
-        self.body = body.serialize(Serializer).unwrap().to_string();
+        unsafe {
+            self.body = body
+                .serialize(Serializer)
+                .unwrap()
+                .to_string()
+                .as_mut_vec()
+                .to_owned();
+        }
         self.headers
             .insert("Content-Length".into(), format!("{}", self.body.len()));
         self.headers

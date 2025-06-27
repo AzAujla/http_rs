@@ -75,6 +75,8 @@ impl App {
                         Request::from_str(std::str::from_utf8(&buf[0..n]).unwrap()).unwrap();
                     let response = router_clone.handle(request).await;
 
+                    println!("{}", response);
+
                     match socket
                         .write_all(format!("{} {}", version, response).as_bytes())
                         .await

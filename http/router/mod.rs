@@ -1,8 +1,11 @@
 use crate::request::Request;
 use crate::{database::DBConnection, http::method::HttpMethod, response::Response};
+use paste::paste;
 use std::collections::HashMap;
 use std::fmt;
+use std::fs::File;
 use std::future::Future;
+use std::io::Read;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -230,6 +233,7 @@ impl RouteTree {
 #[derive(Debug)]
 pub struct Router {
     routes: HashMap<HttpMethod, RouteTree>,
+    static_routes: HashMap<String, String>,
 }
 
 impl Default for Router {
@@ -314,15 +318,28 @@ impl_handler!(Request, &mut Arc<DBConnection>, HashMap<String, String> => Reques
 
 macro_rules! route_method_impl {
     ($name:ident, $variant:ident) => {
-        pub fn $name<F, Args>(mut self, uri: &str, handler: F) -> Self
-        where
-            F: IntoRouteHandler<Args>,
-        {
-            self.routes
-                .get_mut(&crate::http::method::HttpMethod::$variant)
-                .unwrap()
-                .add(uri.to_string(), handler.into_route());
-            self
+        paste! {
+            pub fn [<r_$name>]<F, Args>(&mut self, uri: &str, handler: F) -> &mut Self
+            where
+                F: IntoRouteHandler<Args>,
+            {
+                self.routes
+                    .get_mut(&crate::http::method::HttpMethod::$variant)
+                    .unwrap()
+                    .add(uri.to_string(), handler.into_route());
+                self
+            }
+
+            pub fn $name<F, Args>(mut self, uri: &str, handler: F) -> Self
+            where
+                F: IntoRouteHandler<Args>,
+            {
+                self.routes
+                    .get_mut(&crate::http::method::HttpMethod::$variant)
+                    .unwrap()
+                    .add(uri.to_string(), handler.into_route());
+                self
+            }
         }
     };
 }
@@ -338,7 +355,29 @@ impl Router {
                 (HttpMethod::Delete, RouteTree::new()),
                 (HttpMethod::Options, RouteTree::new()),
             ]),
+            static_routes: HashMap::new(),
         }
+    }
+
+    pub fn serve_dir(mut self, uri: &str, dir: &str) -> Self {
+        self.static_routes.insert(
+            if uri.starts_with("/") {
+                uri.to_string()
+            } else {
+                format!("/{}", uri)
+            },
+            if dir.starts_with("/") {
+                dir.to_string()
+            } else {
+                format!("/{}", dir)
+            },
+        );
+        self
+    }
+
+    pub fn r_serve_dir(&mut self, uri: &str, dir: &str) -> &mut Self {
+        self.static_routes.insert(uri.to_string(), dir.to_string());
+        self
     }
 
     route_method_impl!(get, Get);
@@ -360,6 +399,32 @@ impl Router {
             r.run(request, p, &mut Arc::new(DBConnection::connect()))
                 .await
         } else {
+            for i in &self.static_routes {
+                if request.uri.starts_with(i.0) {
+                    let filename = format!(
+                        ".{}/{}",
+                        i.1,
+                        request.uri.chars().skip(i.0.len()).collect::<String>()
+                    );
+
+                    if let Ok(mut file) = File::open(&filename) {
+                        let mut buf = Vec::new();
+                        if file.read_to_end(&mut buf).is_err() {
+                            return Response::new()
+                                .status(crate::http::status::HttpStatusCode::InternalServerError)
+                                .build();
+                        }
+                        let mime_type = mime_guess::from_path(filename)
+                            .first_or_text_plain()
+                            .to_string();
+                        return Response::new()
+                            .body_raw(buf)
+                            .header("Content-Type", mime_type.as_str())
+                            .build();
+                    }
+                }
+            }
+
             Response::new()
                 .status(crate::http::status::HttpStatusCode::NotFound)
                 .build()

@@ -21,7 +21,8 @@ async fn main() {
             })
             .get("hello", async || {
                 Response::new().body("Hello, World!\n").build()
-            }),
+            })
+            .serve_dir("/", "/assets"),
     )
     .listen(true)
     .await
